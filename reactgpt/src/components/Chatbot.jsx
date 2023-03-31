@@ -77,26 +77,35 @@ const chatWithAI = useCallback(async (messages) => {
 }, []);
   
 
-  const handleSubmit = useCallback(
-    async (e) => {
-      e.preventDefault(); 
+const handleSubmit = useCallback(
+  async (e) => {
+    e.preventDefault();
 
-      if (userInput.trim() === '') return; 
+    if (userInput.trim() === '') return;
 
-      sendMessage(userInput, 'user'); 
-      setUserInput('');
-      setIsTyping(true); 
+    sendMessage(userInput, 'user');
+    setUserInput('');
+    setIsTyping(true);
 
-      const response = await chatWithAI([
-        ...messages,
-        { role: 'user', content: userInput },
-      ]); 
+    const response = await chatWithAI([
+      ...messages,
+      { role: 'user', content: userInput },
+    ]);
 
-      setIsTyping(false); 
+    setIsTyping(false);
+
+    // Check if the response is an error message
+    if (response.message) {
+      // Handle the error message
+      sendMessage(response.message, 'assistant');
+    } else {
+      // If it's not an error message, set it as the assistant's message
       sendMessage(response, 'assistant');
-    },
-    [userInput, messages, chatWithAI]
-  );
+    }
+  },
+  [userInput, messages, chatWithAI]
+);
+
   const Message = ({ message }) => (
     <MessageWrapper user={message.role === 'user'}>
       <MessageContent user={message.role === 'user'}>{message.content}</MessageContent>

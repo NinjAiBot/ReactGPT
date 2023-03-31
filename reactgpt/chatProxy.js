@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { Configuration, OpenAIApi } = require('openai');
@@ -5,6 +6,7 @@ const { body, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
 const logFolderPath = path.join(__dirname, 'logs');
 
@@ -16,8 +18,13 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 const openaiConfiguration = new Configuration({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.REACT_APP_OPENAI_API_KEY,
 });
+
+const supabase = createClient(
+  process.env.REACT_APP_SUPABASE_URL,
+  process.env.REACT_APP_SUPABASE_API
+);
 
 const openai = new OpenAIApi(openaiConfiguration);
 
@@ -34,7 +41,6 @@ const limiter = rateLimit({
 
 // Middleware for logging and blocking attackers
 const blockedIPs = new Set();
-
 const MAX_FAILED_REQUESTS = 3;
 const WINDOW_SIZE = 60 * 1000; // 1 minute
 
@@ -89,8 +95,10 @@ app.use((err, req, res, next) => {
     logToFile(`Blocking IP Address: ${ip}\n`);
     return res.status(403).json({ message: 'Forbidden' });
   }
+  next();
 
   return res.status(500).json({ message });
+
 });
 
 app.use(cors({ origin: 'https://wiki.ninj.ai' }));
@@ -104,6 +112,7 @@ app.post('/api/chat',
       return res.status(400).json({ errors: errors.array() });
     }
     const { messages } = req.body;
+    // console.log('Request Body:', req.body);
     const giveBirthToFrank = `You are an AI assistant named Frank.`;
     try {
       const initialSystemMessage = {
@@ -121,6 +130,7 @@ app.post('/api/chat',
         ],
       });
       const response = openAIResponse.data.choices[0].message.content;
+    //   console.log('OpenAI Response:', response);
       res.json(response);
     } catch (error) {
       console.error('Error communicating with OpenAI:', error);
@@ -129,6 +139,63 @@ app.post('/api/chat',
     }
   }
 );
+
+
+app.post('/api/purchase', async (req, res) => {
+  const { walletAddress, transactionHash, tokensBought } = req.body;
+
+  // Verify the transaction
+  // Here you should verify the transaction details using your preferred method (e.g., Etherscan API)
+  // Make sure the transaction is confirmed and the amount of ETH matches the tokensBought value
+  // For simplicity, we'll assume the transaction is valid in this example
+
+  // Check if the user already exists in the database
+  const { data: existingUser, error } = await supabase
+    .from('user_tokens')
+    .select('*')
+    .eq('wallet_address', walletAddress)
+    .single();
+
+  if (error) {
+    console.error('Error fetching user from the database:', error);
+    return res.status(500).json({ message: 'Internal Server Error' });
+  }
+
+  if (existingUser) {
+    // Update the existing user's token balance
+    const { data: updatedUser, error } = await supabase
+      .from('user_tokens')
+      .update({
+        tokens_owned: existingUser.tokens_owned + tokensBought,
+        tokens_purchased: existingUser.tokens_purchased + tokensBought,
+      })
+      .eq('wallet_address', walletAddress);
+
+    if (error) {
+      console.error('Error updating user in the database:', error);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+
+    res.status(200).json(updatedUser);
+  } else {
+    // Create a new user in the database
+    const { data: newUser, error } = await supabase
+      .from('user_tokens')
+      .insert({
+        wallet_address: walletAddress,
+        tokens_owned: tokensBought,
+        tokens_purchased: tokensBought,
+      });
+
+    if (error) {
+      console.error('Error inserting user into the database:', error);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+
+    res.status(201).json(newUser);
+  }
+});
+
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
