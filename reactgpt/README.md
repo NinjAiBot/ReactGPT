@@ -1,5 +1,7 @@
 # Getting Started with Create React App
 
+// npm i react-icons framer-motion styled-components wagmi web-vitals openai @web3modal/react @web3modal/ethereum ethers react-router-dom react-router-dom react-particles tsparticles @emotion/styled
+
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 ## Available Scripts
